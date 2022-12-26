@@ -1,0 +1,11 @@
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ser="http://www.businessobjects.com/DataServices/ServerX.xsd">
+   <soapenv:Header/>
+   <soapenv:Body>
+      <ser:LogonRequest>
+         <username>bntm-admin</username>
+         <password>Z0pp@5_2o22</password>
+         <cms_system>10.0.23.50:6400</cms_system>
+         <cms_authentication>secEnterprise</cms_authentication>
+      </ser:LogonRequest>
+   </soapenv:Body>
+</soapenv:Envelope>
