@@ -25,7 +25,11 @@ process.env.ORA_SDTZ = 'UTC';
 
 let xml, url, sampleHeaders, output, xmlreq, sessionID, connection;
 
-// soap  request ID session 
+
+// usage of module
+async function requisition__ () {
+  
+  // soap  request ID session 
  url = 'http://10.0.23.50:8080/DataServices/servlet/webservices?ver=2.1';
  sampleHeaders = {
   'user-agent': 'sampleTest',
@@ -35,19 +39,18 @@ let xml, url, sampleHeaders, output, xmlreq, sessionID, connection;
 
 xml = fs.readFileSync('test/logon.xml', 'utf-8');
 
-// usage of module
-async function requisition__ () {
   (async () => {
    let { response } = await soapRequest({ url: url, headers: sampleHeaders, xml: xml, timeout: 5000 }); // Optional timeout parameter(milliseconds)
    let { headers, body, statusCode } = response;
     console.log(headers);
     //console.log(body);
     console.log(statusCode);
+    //extraemos el session id del xml respuesta del logon
     const template = ['soapenv:Envelope/soapenv:Body/localtypes:session', {
      SessionID: 'SessionID' ,
   }];
+
   output = await transform(body, template);
-//console.log(output);
 
 sessionID = (output[0].SessionID);
 console.log(sessionID);
@@ -67,9 +70,31 @@ try {
 
   connection = await oracledb.getConnection(dbConfig);
   logger.transactionLog.log('info', 'succefull connection with database');
+  
+
+  //Select de parametro ID requisition
+  sql =`SELECT a1.param id_a_proc
+  FROM (select DISTINCT rq.req_code param, rq.req_date f_crea
+ from r5requisitions rq, r5requislines rl, sap_planta sp, sap_mov sm, sap_uom su
+ where rq.req_code = rl.rql_req
+ and rq.req_status = 'A'
+ and (rl.rql_udfchkbox05 = '-' or rl.rql_udfchkbox05 IS NULL)
+ and sp.PLANTA_EAM = rq.REQ_TOCODE
+ and sm.MOV_EAM = rq.req_type
+ and su.UOM_EAM (+)= rl.rql_uom
+ order by 2 DESC) a1
+ where ROWNUM < 2`;
+
+ result = await connection.execute(sql, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
+
+ let id_a_proc;
+
+ for (const row of result.rows) {
+  id_a_proc = row.ID_A_PROC;
+
 
  // Select
- sql = `select rq.req_code,
+ sql =`select rq.req_code,
  rq.req_desc,
  rq.req_date,
  TO_CHAR(rq.req_date, 'YYYYMMDD') DELIV_DATE,
@@ -88,26 +113,37 @@ try {
  rq.req_udfchkbox05,
  rl.rql_type,
  rl.rql_req,
- rl.rql_reqline,
+ rl.rql_reqline linea,
  rl.rql_part RQL_PART,
  rl.rql_part_org RQL_PART_ORG,
- rl.rql_qty QTY,
+ abs (rl.rql_qty) QTY,
  NVL(su.UOM_SAP, rl.rql_uom) UOM,
  rl.rql_due
  from r5requisitions rq, r5requislines rl, sap_planta sp, sap_mov sm, sap_uom su
  where rq.req_code = rl.rql_req
  and rq.req_status = 'A'
- and rq.req_udfchkbox05 = '+'
+ and (rl.rql_udfchkbox05 = '-' or rl.rql_udfchkbox05 IS NULL)
  and sp.PLANTA_EAM = rq.REQ_TOCODE
  and sm.MOV_EAM = rq.req_type
  and su.UOM_EAM (+)= rl.rql_uom
- and rq.req_code = 12311
+ and rq.req_code = :id_req
  and rl.rql_part not in ('58022510-M')
- and ROWNUM < 4
- order by rq.req_code DESC`;
+ order by rl.rql_reqline`;
 
 
-  result = await connection.execute(sql, {}, { outFormat: oracledb.OBJECT });
+ options = {
+outFormat: oracledb.OBJECT
+
+};
+
+ //result = await connection.execute(sql, binds, options);
+ //result = await connection.execute(sql, options, {param:{val: param, dir:oracledb.BIND_IN, type: oracledb.OBJECT}});
+
+ result = await connection.execute(sql, {id_req: { dir: oracledb.BIND_IN, val: id_a_proc, type: oracledb.STRING }}, options);
+
+ //result = await connection.execute(sql,{id_param: { dir: oracledb.BIND_IN, val: id_a_proc, type: oracledb.STRING }, id_param_lin: { dir: oracledb.BIND_IN, val: id_a_proc_lin, type: oracledb.STRING }}
+//hacer update despues del estatus 200 acordarsze de ese pendiente
+//hacer de nuevo el select 
 
   console.log('RESULTSET:' + JSON.stringify(result));
 
@@ -152,10 +188,47 @@ console.log(xmlreq);
 
  response  = await soapRequest({ url: url, headers: sampleHeaders, xml: xmlreq, timeout: 15000 }); // Optional timeout parameter(milliseconds)
  headers, body, statusCode = response;
-//console.log(headers);
 console.log(statusCode);
+
+//convertimos respuesta de type xml en variable
+const template = ['soapenv:Envelope/soapenv:Body/response/messages/message', {
+  type: 'type',
+ 
+}]
+const type = await transform(statusCode.response.body, template);
+//console.log("esto es el type !!!!", type)
+
+if(statusCode.response.statusCode === 200 && type != "E" ) {
+  /*
+  sql = `UPDATE r5requislines SET RQL_UDFCHKBOX05 = '+', 
+  RQL_UDFDATE05 = sysdate WHERE rql_req = :id_param 
+  and rql_reqline = :id_param_line`;
+*/
+
+sql = `UPDATE r5requislines SET RQL_UDFCHKBOX05 = '+', 
+RQL_UDFDATE05 = sysdate WHERE rql_req = :id_param`;
+
+  options = {
+    outFormat: oracledb.OBJECT,
+    autoCommit: true
+  
+    };
+
+  result = await connection.execute(sql,{id_param: { dir: oracledb.BIND_IN, val: id_a_proc, 
+    type: oracledb.STRING }}, options);
+
+     //id_param_lin: { dir: oracledb.BIND_IN, val: id_a_proc_lin, type: oracledb.STRING }}, options)
+
+ // console.log("el tipo es ", statusCode.response.statusCode)
+} 
 logger.transactionLog.log('info', statusCode);
 //console.log(body);
+
+//termina foreach para ejecutar cada id del 
+
+
+};
+
 } catch (err) {
   console.error(err);
   logger.transactionLog.log('error', err);
