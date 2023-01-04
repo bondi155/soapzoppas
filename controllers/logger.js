@@ -15,7 +15,7 @@ const transactionLog = createLogger({
    transports:[
     new transports.DailyRotateFile({ 
 
-            filename: 'log/xmlapp-%DATE%.log',
+            filename: 'log/transaction-%DATE%.log',
             datePattern:'YYYY-MM-DD',
             level: 'info',
             maxSize: '20m',
@@ -25,7 +25,7 @@ const transactionLog = createLogger({
 
         }),
         new transports.DailyRotateFile({
-            filename:'log/error-%DATE%.log',
+            filename:'log/error-transaction-%DATE%.log',
             level:'error',
             maxSize: '20m',
             maxFiles: '14d',
@@ -36,8 +36,39 @@ const transactionLog = createLogger({
         })
     ]
 })
+
+const requisitionLog = createLogger({
+    
+    transports:[
+     new transports.DailyRotateFile({ 
+ 
+             filename: 'log/requisition-%DATE%.log',
+             datePattern:'YYYY-MM-DD',
+             level: 'info',
+             maxSize: '20m',
+             maxFiles: '14d',
+             zippedArchive: true,
+             format: format.combine(format.timestamp({format: timezoned}), format.prettyPrint())
+ 
+         }),
+         new transports.DailyRotateFile({
+             filename:'log/error-requisition-%DATE%.log',
+             level:'error',
+             maxSize: '20m',
+             maxFiles: '14d',
+             zippedArchive: true,
+             datePattern: 'YYYY-MM-DD',
+             format: format.combine(format.timestamp({format: timezoned}), format.prettyPrint())
+ 
+         })
+     ]
+ })
+
+
+
 //si no se quiere log diario con fecha en filename cambiar DailyRotateFile x file y quitar %DATE% de los titulos.
 
 module.exports={
-    transactionLog
+    transactionLog,
+    requisitionLog
 }

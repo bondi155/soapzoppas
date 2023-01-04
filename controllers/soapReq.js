@@ -69,8 +69,7 @@ try {
   let sql, binds, options, result;
 
   connection = await oracledb.getConnection(dbConfig);
-  logger.transactionLog.log('info', 'succefull connection with database');
-  
+//  logger.requisitionLog.log('info', 'succefull connection to oracle DB ');
 
   //Select de parametro ID requisition
   sql =`SELECT a1.param id_a_proc
@@ -81,9 +80,10 @@ try {
  and (rl.rql_udfchkbox05 = '-' or rl.rql_udfchkbox05 IS NULL)
  and sp.PLANTA_EAM = rq.REQ_TOCODE
  and sm.MOV_EAM = rq.req_type
+ and DECODE(SIGN(rl.rql_qty), (-1), '-', '+') = sm.SIGNO
  and su.UOM_EAM (+)= rl.rql_uom
  order by 2 DESC) a1
- where ROWNUM < 2`;
+ WHERE ROWNUM < 4`;
 
  result = await connection.execute(sql, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
 
@@ -93,7 +93,7 @@ try {
   id_a_proc = row.ID_A_PROC;
 
 
- // Select
+  // Select
  sql =`select rq.req_code,
  rq.req_desc,
  rq.req_date,
@@ -125,11 +125,11 @@ try {
  and (rl.rql_udfchkbox05 = '-' or rl.rql_udfchkbox05 IS NULL)
  and sp.PLANTA_EAM = rq.REQ_TOCODE
  and sm.MOV_EAM = rq.req_type
+ and DECODE(SIGN(rl.rql_qty), (-1), '-', '+') = sm.SIGNO
  and su.UOM_EAM (+)= rl.rql_uom
  and rq.req_code = :id_req
  and rl.rql_part not in ('58022510-M')
  order by rl.rql_reqline`;
-
 
  options = {
 outFormat: oracledb.OBJECT
@@ -163,7 +163,7 @@ EDI_DC40 = result.rows.map((column) => ({
 }));
 
 console.log(EDI_DC40);
-//logger.transactionLog.log('info', EDI_DC40);
+//logger.requisitionLog.log('info', EDI_DC40);
 
 let xml2 = jsonxml(EDI_DC40, options)
 
@@ -217,11 +217,13 @@ RQL_UDFDATE05 = sysdate WHERE rql_req = :id_param`;
   result = await connection.execute(sql,{id_param: { dir: oracledb.BIND_IN, val: id_a_proc, 
     type: oracledb.STRING }}, options);
 
+    logger.requisitionLog.log('info', "procesado correctamente. ID req : " + id_a_proc + '.');
+
      //id_param_lin: { dir: oracledb.BIND_IN, val: id_a_proc_lin, type: oracledb.STRING }}, options)
 
  // console.log("el tipo es ", statusCode.response.statusCode)
 } 
-logger.transactionLog.log('info', statusCode);
+
 //console.log(body);
 
 //termina foreach para ejecutar cada id del 
@@ -231,7 +233,7 @@ logger.transactionLog.log('info', statusCode);
 
 } catch (err) {
   console.error(err);
-  logger.transactionLog.log('error', err);
+  logger.transactionLog.log("error", err.response.data);
 } finally {
   if (connection) {
     try {

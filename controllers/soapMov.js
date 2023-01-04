@@ -32,7 +32,7 @@ async function movement__() {
     }); // Optional timeout parameter(milliseconds)
     let { headers, body, statusCode } = response;
     console.log(headers);
-    //console.log(body);
+    console.log(body);
     console.log(statusCode);
     const template = [
       "soapenv:Envelope/soapenv:Body/localtypes:session",
@@ -44,7 +44,7 @@ async function movement__() {
     //console.log(output);
 
     sessionID = output[0].SessionID;
-    console.log(sessionID);
+    //console.log(sessionID);
 
     //request purchase order
     url = "http://10.0.23.50:8080/DataServices/servlet/webservices?ver=2.1";
@@ -60,26 +60,27 @@ async function movement__() {
       let sql, binds, options, result;
 
       connection = await oracledb.getConnection(dbConfig);
-      logger.transactionLog.log("info", "succefull connection");
+      logger.transactionLog.log("info", "succefull connection to oracle DB ");
 
-      //select parametro movement
+      //select parametro movement transaction
       sql = `SELECT a1.param id_a_proc
-      FROM (select DISTINCT tr.tra_code param, tr.tra_created f_crea
-     from r5transactions tr, r5translines tl, r5parts pa, 
-     sap_planta sp, sap_mov sm, sap_cencos sc, sap_uom su
-     where 1 = 1
-     and tl.trl_trans = tr.tra_code
-     and tl.trl_part = pa.par_code
-     and sp.PLANTA_EAM = tr.TRA_FROMCODE
-     and sm.MOV_EAM = tl.trl_type
-     and sc.CENCOS_EAM (+)= tl.trl_costcode
-     and sc.PLANTA_EAM (+)= tl.trl_store
-     and tr.tra_status = 'A'
-     and (trl_udfchkbox05 = '-' or trl_udfchkbox05 IS NULL)
-     and su.UOM_EAM (+)= pa.par_uom
-     --and tr.tra_created > (sysdate - 6)
-     order by 2 DESC) a1
-     WHERE ROWNUM < 2`;
+   FROM (select DISTINCT tr.tra_code param, tr.tra_created f_crea
+  from r5transactions tr, r5translines tl, r5parts pa, 
+  sap_planta sp, sap_mov sm, sap_cencos sc, sap_uom su
+  where 1 = 1
+  and tl.trl_trans = tr.tra_code
+  and tl.trl_part = pa.par_code
+  and sp.PLANTA_EAM = tr.TRA_FROMCODE
+  and sm.MOV_EAM = tl.trl_type
+and DECODE(SIGN(tl.trl_qty), (-1), '-', '+') = sm.SIGNO
+  and sc.CENCOS_EAM (+)= tl.trl_costcode
+  and sc.PLANTA_EAM (+)= tl.trl_store
+  and tr.tra_status = 'A'
+  and (trl_udfchkbox05 = '-' or trl_udfchkbox05 IS NULL)
+  and su.UOM_EAM (+)= pa.par_uom
+  --and tr.tra_created > (sysdate - 6)
+  order by 2 DESC) a1
+  WHERE ROWNUM < 2`;
 
       result = await connection.execute(sql, [], {
         outFormat: oracledb.OUT_FORMAT_OBJECT,
@@ -115,7 +116,7 @@ where tr.tra_code = :id_mov`;
 
         //result = await connection.execute(sql, {}, { outFormat: oracledb.OBJECT });
 
-        console.log("RESULTSET:" + JSON.stringify(result));
+        // console.log("RESULTSET:" + JSON.stringify(result));
 
         let E1BP2017_GM_HEAD_01 = [];
 
@@ -126,47 +127,47 @@ where tr.tra_code = :id_mov`;
             "inp:HEADER_TXT": column.HEADER_TXT,
           },
         }));
-        console.log(E1BP2017_GM_HEAD_01);
+        // console.log(E1BP2017_GM_HEAD_01);
 
         let xmlHead = jsonxml(E1BP2017_GM_HEAD_01, options);
 
-        console.log(xmlHead);
+        // console.log(xmlHead);
 
-        // Select
         sql = `select tr.tra_code,
-TO_CHAR (tr.tra_updated, 'YYYYMMDD') DELIV_DATE,
-sp.PLANTA_SAP PLANTA,
-sm.MOV_SAP COD_MOV,
-NVL(sc.CENCOS_SAP, tl.trl_costcode) CENCOS,
-TO_CHAR(tr.tra_code)||LPAD(tl.trl_line,2, '0') TRACK_NO,
-tr.tra_type,
-tr.tra_org,
-tr.tra_status,
-tl.trl_trans,
-sp.STORAGE_SAP STOR_LOC,
-tl.trl_line,
-tl.trl_part,
-tl.trl_part_org,
-tl.trl_type,
-abs(tl.trl_qty) CANTIDAD,
-tl.trl_costcode,
-tl.trl_bin,
-tl.trl_sourcecode,
-pa.par_code,
-NVL(su.UOM_SAP, pa.par_uom) UNIDAD
-from r5transactions tr, r5translines tl, r5parts pa, sap_planta sp, sap_mov sm, sap_cencos sc, sap_uom su
-where 1 = 1
-and tr.tra_code = :id_mov
-and tl.trl_trans = tr.tra_code
-and tl.trl_part = pa.par_code
-and sp.PLANTA_EAM = tr.TRA_FROMCODE
-and sm.MOV_EAM = tl.trl_type
-and sc.CENCOS_EAM (+)= tl.trl_costcode
-and sc.PLANTA_EAM (+)= tl.trl_store
-and tr.tra_status = 'A'
-and (trl_udfchkbox05 = '-' or trl_udfchkbox05 IS NULL)
-and su.UOM_EAM (+)= pa.par_uom
-order by tl.trl_line`;
+        TO_CHAR (tr.tra_updated, 'YYYYMMDD') DELIV_DATE,
+        sp.PLANTA_SAP PLANTA,
+        sm.MOV_SAP COD_MOV,
+        NVL(sc.CENCOS_SAP, tl.trl_costcode) CENCOS,
+        TO_CHAR(tr.tra_code)||LPAD(tl.trl_line,2, '0') TRACK_NO,
+        tr.tra_type,
+        tr.tra_org,
+        tr.tra_status,
+        tl.trl_trans,
+        sp.STORAGE_SAP STOR_LOC,
+        tl.trl_line,
+        tl.trl_part,
+        tl.trl_part_org,
+        tl.trl_type,
+        abs(tl.trl_qty) CANTIDAD,
+        tl.trl_costcode,
+        tl.trl_bin,
+        tl.trl_sourcecode,
+        pa.par_code,
+        NVL(su.UOM_SAP, pa.par_uom) UNIDAD
+        from r5transactions tr, r5translines tl, r5parts pa, sap_planta sp, sap_mov sm, sap_cencos sc, sap_uom su
+        where 1 = 1
+        and tr.tra_code = :id_mov
+        and tl.trl_trans = tr.tra_code
+        and tl.trl_part = pa.par_code
+        and sp.PLANTA_EAM = tr.TRA_FROMCODE
+        and sm.MOV_EAM = tl.trl_type
+        and DECODE(SIGN(tl.trl_qty), (-1), '-', '+') = sm.SIGNO
+        and sc.CENCOS_EAM (+)= tl.trl_costcode
+        and sc.PLANTA_EAM (+)= tl.trl_store
+        and tr.tra_status = 'A'
+        and (trl_udfchkbox05 = '-' or trl_udfchkbox05 IS NULL)
+        and su.UOM_EAM (+)= pa.par_uom
+        order BY tl.trl_line`;
 
         options = {
           outFormat: oracledb.OBJECT,
@@ -186,7 +187,7 @@ order by tl.trl_line`;
 
         //reesult = await connection.execute(sql, {}, { outFormat: oracledb.OBJECT });
 
-        console.log("RESULTSET:" + JSON.stringify(result));
+        // console.log("RESULTSET:" + JSON.stringify(result));
 
         let E1BP2017_GM_ITEM_CREATE = [];
 
@@ -202,11 +203,11 @@ order by tl.trl_line`;
           },
         }));
 
-        console.log(E1BP2017_GM_ITEM_CREATE);
+        //console.log(E1BP2017_GM_ITEM_CREATE);
 
         let xmlDetail = jsonxml(E1BP2017_GM_ITEM_CREATE, options);
 
-        console.log(xmlDetail);
+        // console.log(xmlDetail);
 
         xmlmov = `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ser="http://www.businessobjects.com/DataServices/ServerX.xsd" xmlns:inp="http://businessobjects.com/service/SRV_IDOC_MBGM/input">
 <soapenv:Header>
@@ -228,7 +229,7 @@ order by tl.trl_line`;
  </inp:MBGMCR03>
 </soapenv:Body>
 </soapenv:Envelope>`;
-        console.log(xmlmov);
+        //        console.log(xmlmov);
 
         response = await soapRequest({
           url: url,
@@ -236,24 +237,30 @@ order by tl.trl_line`;
           xml: xmlmov,
           timeout: 65000,
         }); // Optional timeout parameter(milliseconds)
-        headers, body, (statusCode = response);
+        headers, body, statusCode = response;
         //console.log(headers);
-        console.log(statusCode);
-        logger.transactionLog.log("info", statusCode);
+        //console.log(statusCode.status);
         //console.log(body);
 
+        logger.transactionLog.log("info", statusCode.response.body && statusCode.response.statusCode );
+       
+        //console.log(statusCode.response.statusCode);
+
+
+
+
         //convertimos respuesta de type xml en variable
-const template = ['soapenv:Envelope/soapenv:Body/response/messages/message', {
-  type: 'type',
- 
-}]
-const type = await transform(statusCode.response.body, template);
+        const template = ['soapenv:Envelope/soapenv:Body/response/messages/message', {
+          type: 'type',
+
+        }]
+        const type = await transform(statusCode.response.body, template);
 
 
-        if (statusCode.response.statusCode === 200 && type != "E" ) {
+        if (statusCode.response.statusCode === 200 && type != "E") {
           sql = `UPDATE r5translines SET TRL_UDFCHKBOX05 = '+',
            TRL_UDFDATE05 = sysdate WHERE trl_trans IN :id_param `;
-           //and trl_line = :id_param_line`;
+          //and trl_line = :id_param_line`;
 
           options = {
             outFormat: oracledb.OBJECT,
@@ -276,6 +283,8 @@ const type = await transform(statusCode.response.body, template);
             },
             options
           );
+          logger.transactionLog.log('info', "procesado correctamente. ID mov : " + id_a_proc + '.');
+
         }
 
         //termina foreach para ejecutar cada id del
@@ -284,7 +293,8 @@ const type = await transform(statusCode.response.body, template);
       }
     } catch (err) {
       console.error(err);
-      logger.transactionLog.log("error", err);
+      logger.transactionLog.log("error", err.response.data  );
+
     } finally {
       if (connection) {
         try {
