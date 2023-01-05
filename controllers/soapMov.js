@@ -80,7 +80,7 @@ and DECODE(SIGN(tl.trl_qty), (-1), '-', '+') = sm.SIGNO
   and su.UOM_EAM (+)= pa.par_uom
   --and tr.tra_created > (sysdate - 6)
   order by 2 DESC) a1
-  WHERE ROWNUM < 2`;
+  WHERE ROWNUM < 20`;
 
       result = await connection.execute(sql, [], {
         outFormat: oracledb.OUT_FORMAT_OBJECT,
@@ -245,10 +245,6 @@ where tr.tra_code = :id_mov`;
         logger.transactionLog.log("info", statusCode.response.body && statusCode.response.statusCode );
        
         //console.log(statusCode.response.statusCode);
-
-
-
-
         //convertimos respuesta de type xml en variable
         const template = ['soapenv:Envelope/soapenv:Body/response/messages/message', {
           type: 'type',
@@ -293,7 +289,11 @@ where tr.tra_code = :id_mov`;
       }
     } catch (err) {
       console.error(err);
-      logger.transactionLog.log("error", err.response.data  );
+     if (err.code === 'ERR_BAD_RESPONSE'){ 
+      logger.transactionLog.log("error", err.response.data)
+      } else {
+      logger.transactionLog.log("error", err.message)
+    }
 
     } finally {
       if (connection) {

@@ -83,7 +83,7 @@ try {
  and DECODE(SIGN(rl.rql_qty), (-1), '-', '+') = sm.SIGNO
  and su.UOM_EAM (+)= rl.rql_uom
  order by 2 DESC) a1
- WHERE ROWNUM < 4`;
+ WHERE ROWNUM < 20`;
 
  result = await connection.execute(sql, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
 
@@ -145,7 +145,7 @@ outFormat: oracledb.OBJECT
 //hacer update despues del estatus 200 acordarsze de ese pendiente
 //hacer de nuevo el select 
 
-  console.log('RESULTSET:' + JSON.stringify(result));
+  //console.log('RESULTSET:' + JSON.stringify(result));
 
   let EDI_DC40 = [];
 
@@ -162,7 +162,7 @@ EDI_DC40 = result.rows.map((column) => ({
   },
 }));
 
-console.log(EDI_DC40);
+//console.log(EDI_DC40);
 //logger.requisitionLog.log('info', EDI_DC40);
 
 let xml2 = jsonxml(EDI_DC40, options)
@@ -184,7 +184,7 @@ xmlreq = `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envel
 </soapenv:Body>
 </soapenv:Envelope>`;
 
-console.log(xmlreq);
+//console.log(xmlreq);
 
  response  = await soapRequest({ url: url, headers: sampleHeaders, xml: xmlreq, timeout: 15000 }); // Optional timeout parameter(milliseconds)
  headers, body, statusCode = response;
@@ -233,7 +233,12 @@ RQL_UDFDATE05 = sysdate WHERE rql_req = :id_param`;
 
 } catch (err) {
   console.error(err);
-  logger.transactionLog.log("error", err.response.data);
+  if (err.code === 'ERR_BAD_RESPONSE'){ 
+    logger.requisitionLog.log("error", err.response.data)
+    } else {
+    logger.requisitionLog.log("error", err.message)
+  }
+
 } finally {
   if (connection) {
     try {
