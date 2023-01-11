@@ -64,23 +64,23 @@ async function movement__() {
 
       //select parametro movement transaction
       sql = `SELECT a1.param id_a_proc
-   FROM (select DISTINCT tr.tra_code param, tr.tra_created f_crea
-  from r5transactions tr, r5translines tl, r5parts pa, 
-  sap_planta sp, sap_mov sm, sap_cencos sc, sap_uom su
-  where 1 = 1
-  and tl.trl_trans = tr.tra_code
-  and tl.trl_part = pa.par_code
-  and sp.PLANTA_EAM = tr.TRA_FROMCODE
-  and sm.MOV_EAM = tl.trl_type
-and DECODE(SIGN(tl.trl_qty), (-1), '-', '+') = sm.SIGNO
-  and sc.CENCOS_EAM (+)= tl.trl_costcode
-  and sc.PLANTA_EAM (+)= tl.trl_store
-  and tr.tra_status = 'A'
-  and (trl_udfchkbox05 = '-' or trl_udfchkbox05 IS NULL)
-  and su.UOM_EAM (+)= pa.par_uom
-  --and tr.tra_created > (sysdate - 6)
-  order by 2 DESC) a1
-  WHERE ROWNUM < 20`;
+      FROM (select DISTINCT tr.tra_code param, tr.tra_created f_crea
+      from r5transactions tr, r5translines tl, r5parts pa, 
+      sap_planta sp, sap_mov sm, sap_cencos sc, sap_uom su
+      where 1 = 1
+      and tl.trl_trans = tr.tra_code
+      and tl.trl_part = pa.par_code
+      and sp.PLANTA_EAM = tr.TRA_FROMCODE
+      and sm.MOV_EAM = tl.trl_type
+      and DECODE(SIGN(tl.trl_qty), (-1), '-', '+') = sm.SIGNO
+      and sc.CENCOS_EAM (+)= tl.trl_costcode
+      and sc.PLANTA_EAM (+)= tl.trl_store
+      and tr.tra_status = 'A'
+      and (trl_udfchkbox05 = '-' or trl_udfchkbox05 IS NULL)
+      and su.UOM_EAM (+)= pa.par_uom
+      --and tr.tra_created > (sysdate - 6)
+      order by 2 DESC) a1
+      WHERE ROWNUM < 21`;
 
       result = await connection.execute(sql, [], {
         outFormat: oracledb.OUT_FORMAT_OBJECT,
@@ -88,15 +88,18 @@ and DECODE(SIGN(tl.trl_qty), (-1), '-', '+') = sm.SIGNO
 
       let id_a_proc;
 
+      let primerCiclo = true;
+
       for (const row of result.rows) {
         id_a_proc = row.ID_A_PROC;
 
+
         // Select
-        sql = `select tr.tra_desc HEADER_TXT,
-TO_CHAR(tr.tra_created, 'YYYYMMDD') DOC_DATE,
-TO_CHAR(tr.tra_updated, 'YYYYMMDD') PSTNG_DATE
-from r5transactions tr
-where tr.tra_code = :id_mov`;
+        sql = `select SUBSTR(tr.tra_desc, 1, 25) HEADER_TXT ,
+        TO_CHAR(tr.tra_created, 'YYYYMMDD') DOC_DATE,
+        TO_CHAR(tr.tra_updated, 'YYYYMMDD') PSTNG_DATE
+        from r5transactions tr
+        where tr.tra_code = :id_mov`;
 
         options = {
           outFormat: oracledb.OBJECT,
@@ -122,8 +125,8 @@ where tr.tra_code = :id_mov`;
 
         E1BP2017_GM_HEAD_01 = result.rows.map((column) => ({
           "inp:E1BP2017_GM_HEAD_01": {
-            "inp:PSTNG_DATE": "20221215",
-            "inp:DOC_DATE": "20221215",
+            "inp:PSTNG_DATE": column.PSTNG_DATE,
+            "inp:DOC_DATE": column.DOC_DATE,
             "inp:HEADER_TXT": column.HEADER_TXT,
           },
         }));
@@ -210,26 +213,26 @@ where tr.tra_code = :id_mov`;
         // console.log(xmlDetail);
 
         xmlmov = `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ser="http://www.businessobjects.com/DataServices/ServerX.xsd" xmlns:inp="http://businessobjects.com/service/SRV_IDOC_MBGM/input">
-<soapenv:Header>
- <ser:session>
-    <SessionID>${sessionID}</SessionID>
- </ser:session>
-</soapenv:Header>
-<soapenv:Body>
- <inp:MBGMCR03>
-    <inp:EDI_DC40>
-    </inp:EDI_DC40>
-    <inp:E1MBGMCR>
-    ${xmlHead}
-       <inp:E1BP2017_GM_CODE>
-          <inp:GM_CODE>03</inp:GM_CODE>
-       </inp:E1BP2017_GM_CODE>
-       ${xmlDetail}
-    </inp:E1MBGMCR>
- </inp:MBGMCR03>
-</soapenv:Body>
-</soapenv:Envelope>`;
-        //        console.log(xmlmov);
+        <soapenv:Header>
+        <ser:session>
+            <SessionID>${sessionID}</SessionID>
+        </ser:session>
+        </soapenv:Header>
+        <soapenv:Body>
+        <inp:MBGMCR03>
+            <inp:EDI_DC40>
+            </inp:EDI_DC40>
+            <inp:E1MBGMCR>
+            ${xmlHead}
+              <inp:E1BP2017_GM_CODE>
+                  <inp:GM_CODE>03</inp:GM_CODE>
+              </inp:E1BP2017_GM_CODE>
+              ${xmlDetail}
+            </inp:E1MBGMCR>
+        </inp:MBGMCR03>
+        </soapenv:Body>
+        </soapenv:Envelope>`;
+        console.log(xmlmov);
 
         response = await soapRequest({
           url: url,
@@ -242,20 +245,30 @@ where tr.tra_code = :id_mov`;
         //console.log(statusCode.status);
         //console.log(body);
 
-        logger.transactionLog.log("info", statusCode.response.body && statusCode.response.statusCode );
-       
+        logger.transactionLog.log("info", statusCode.response.body && statusCode.response.statusCode);
+
         //console.log(statusCode.response.statusCode);
         //convertimos respuesta de type xml en variable
         const template = ['soapenv:Envelope/soapenv:Body/response/messages/message', {
           type: 'type',
-
+          content: 'content'
         }]
-        const type = await transform(statusCode.response.body, template);
 
+        const propiedades = await transform(statusCode.response.body, template);
 
-        if (statusCode.response.statusCode === 200 && type != "E") {
+        const tipo = (propiedades[0].type);
+        const contErr = (propiedades[0].content);
+
+        console.log(tipo);
+        console.log(contErr);
+
+         if (tipo === 'E') {
+
+        logger.transactionLog.log('error', `${contErr} procesado con error no se marcó en base de datos. ID req : ${id_a_proc}.`);
+
+        } else if (statusCode.response.statusCode === 200 && tipo != "E") {
           sql = `UPDATE r5translines SET TRL_UDFCHKBOX05 = '+',
-           TRL_UDFDATE05 = sysdate WHERE trl_trans IN :id_param `;
+           TRL_UDFDATE05 = sysdate WHERE trl_trans IN :id_param`;
           //and trl_line = :id_param_line`;
 
           options = {
@@ -279,21 +292,27 @@ where tr.tra_code = :id_mov`;
             },
             options
           );
-          logger.transactionLog.log('info', "procesado correctamente. ID mov : " + id_a_proc + '.');
+          logger.transactionLog.log('info', `procesado correctamente. ID mov : ${id_a_proc} . ${contErr}`);
+
 
         }
-
         //termina foreach para ejecutar cada id del
 
         console.log("\nEl id a proc es:", id_a_proc);
+        primerCiclo = false;
       }
+
+      if (primerCiclo === true) {
+        console.log("no hay transactions codes para procesar")
+      }
+
     } catch (err) {
       console.error(err);
-     if (err.code === 'ERR_BAD_RESPONSE'){ 
-      logger.transactionLog.log("error", err.response.data)
+      if (err.code === 'ERR_BAD_RESPONSE') {
+        logger.transactionLog.log("error", err.response.data)
       } else {
-      logger.transactionLog.log("error", err.message)
-    }
+        logger.transactionLog.log("error", err.message)
+      }
 
     } finally {
       if (connection) {

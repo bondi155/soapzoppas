@@ -15,7 +15,7 @@ const transactionLog = createLogger({
    transports:[
     new transports.DailyRotateFile({ 
 
-            filename: 'log/transaction-%DATE%.log',
+            filename: 'log/Mov-%DATE%.log',
             datePattern:'YYYY-MM-DD',
             level: 'info',
             maxSize: '20m',
@@ -25,7 +25,7 @@ const transactionLog = createLogger({
 
         }),
         new transports.DailyRotateFile({
-            filename:'log/error-transaction-%DATE%.log',
+            filename:'log/error-Mov-%DATE%.log',
             level:'error',
             maxSize: '20m',
             maxFiles: '14d',
@@ -42,7 +42,7 @@ const requisitionLog = createLogger({
     transports:[
      new transports.DailyRotateFile({ 
  
-             filename: 'log/requisition-%DATE%.log',
+             filename: 'log/Purch-%DATE%.log',
              datePattern:'YYYY-MM-DD',
              level: 'info',
              maxSize: '20m',
@@ -52,7 +52,7 @@ const requisitionLog = createLogger({
  
          }),
          new transports.DailyRotateFile({
-             filename:'log/error-requisition-%DATE%.log',
+             filename:'log/error-Purch-%DATE%.log',
              level:'error',
              maxSize: '20m',
              maxFiles: '14d',

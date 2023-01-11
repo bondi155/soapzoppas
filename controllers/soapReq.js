@@ -25,7 +25,6 @@ process.env.ORA_SDTZ = 'UTC';
 
 let xml, url, sampleHeaders, output, xmlreq, sessionID, connection;
 
-
 // usage of module
 async function requisition__ () {
   
@@ -74,26 +73,29 @@ try {
   //Select de parametro ID requisition
   sql =`SELECT a1.param id_a_proc
   FROM (select DISTINCT rq.req_code param, rq.req_date f_crea
- from r5requisitions rq, r5requislines rl, sap_planta sp, sap_mov sm, sap_uom su
- where rq.req_code = rl.rql_req
- and rq.req_status = 'A'
- and (rl.rql_udfchkbox05 = '-' or rl.rql_udfchkbox05 IS NULL)
- and sp.PLANTA_EAM = rq.REQ_TOCODE
- and sm.MOV_EAM = rq.req_type
- and DECODE(SIGN(rl.rql_qty), (-1), '-', '+') = sm.SIGNO
- and su.UOM_EAM (+)= rl.rql_uom
- order by 2 DESC) a1
- WHERE ROWNUM < 20`;
+  from r5requisitions rq, r5requislines rl, sap_planta sp, sap_mov sm, sap_uom su
+  where rq.req_code = rl.rql_req
+  and rq.req_status = 'A'
+  and (rl.rql_udfchkbox05 = '-' or rl.rql_udfchkbox05 IS NULL)
+  and sp.PLANTA_EAM = rq.REQ_TOCODE
+  and sm.MOV_EAM = rq.req_type
+  and DECODE(SIGN(rl.rql_qty), (-1), '-', '+') = sm.SIGNO
+  and su.UOM_EAM (+)= rl.rql_uom
+  order by 2 DESC) a1
+  WHERE ROWNUM < 21`;
 
  result = await connection.execute(sql, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
 
  let id_a_proc;
 
+ let primerCiclo = true;
+
+
  for (const row of result.rows) {
   id_a_proc = row.ID_A_PROC;
 
 
-  // Select
+// Select
  sql =`select rq.req_code,
  rq.req_desc,
  rq.req_date,
@@ -145,9 +147,9 @@ outFormat: oracledb.OBJECT
 //hacer update despues del estatus 200 acordarsze de ese pendiente
 //hacer de nuevo el select 
 
-  //console.log('RESULTSET:' + JSON.stringify(result));
-
-  let EDI_DC40 = [];
+console.log('RESULTSET:' + JSON.stringify(result));
+  
+let EDI_DC40 = [];
 
 EDI_DC40 = result.rows.map((column) => ({
   "inp:E1BPEBANC": {
@@ -162,12 +164,12 @@ EDI_DC40 = result.rows.map((column) => ({
   },
 }));
 
-//console.log(EDI_DC40);
+console.log(EDI_DC40);
 //logger.requisitionLog.log('info', EDI_DC40);
 
 let xml2 = jsonxml(EDI_DC40, options)
 
-console.log(xml2);
+//console.log(xml2);
 
 xmlreq = `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ser="http://www.businessobjects.com/DataServices/ServerX.xsd" xmlns:inp="http://businessobjects.com/service/SRV_IDOC_PREQ/input">
 <soapenv:Header>
@@ -184,21 +186,33 @@ xmlreq = `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envel
 </soapenv:Body>
 </soapenv:Envelope>`;
 
-//console.log(xmlreq);
+console.log(xmlreq);
 
- response  = await soapRequest({ url: url, headers: sampleHeaders, xml: xmlreq, timeout: 15000 }); // Optional timeout parameter(milliseconds)
+//request purchase order
+ response  = await soapRequest({ url: url, headers: sampleHeaders, xml: xmlreq, timeout: 55000 }); // Optional timeout parameter(milliseconds)
  headers, body, statusCode = response;
 console.log(statusCode);
 
 //convertimos respuesta de type xml en variable
 const template = ['soapenv:Envelope/soapenv:Body/response/messages/message', {
-  type: 'type',
- 
-}]
-const type = await transform(statusCode.response.body, template);
-//console.log("esto es el type !!!!", type)
+  type: 'type', 
+  content: 'content'
+  }]
 
-if(statusCode.response.statusCode === 200 && type != "E" ) {
+const propiedades = await transform(statusCode.response.body, template);
+
+const tipo = (propiedades[0].type);
+const contErr = (propiedades[0].content);
+
+console.log(tipo);
+console.log(contErr);
+
+
+if(tipo === 'E'){
+  
+  logger.requisitionLog.log('error', `${contErr} procesado con error no se marcó en base de datos. ID req : ${id_a_proc}.`);
+
+}else if(statusCode.response.statusCode === 200 && tipo != 'E' ) {
   /*
   sql = `UPDATE r5requislines SET RQL_UDFCHKBOX05 = '+', 
   RQL_UDFDATE05 = sysdate WHERE rql_req = :id_param 
@@ -217,19 +231,19 @@ RQL_UDFDATE05 = sysdate WHERE rql_req = :id_param`;
   result = await connection.execute(sql,{id_param: { dir: oracledb.BIND_IN, val: id_a_proc, 
     type: oracledb.STRING }}, options);
 
-    logger.requisitionLog.log('info', "procesado correctamente. ID req : " + id_a_proc + '.');
+    logger.requisitionLog.log('info', `procesado correctamente. ID req : ${id_a_proc} .${contErr}`);
 
-     //id_param_lin: { dir: oracledb.BIND_IN, val: id_a_proc_lin, type: oracledb.STRING }}, options)
+  //id_param_lin: { dir: oracledb.BIND_IN, val: id_a_proc_lin, type: oracledb.STRING }}, options)
 
  // console.log("el tipo es ", statusCode.response.statusCode)
-} 
+}
 
 //console.log(body);
-
 //termina foreach para ejecutar cada id del 
-
-
+primerCiclo = false;
 };
+if (primerCiclo === true ){ 
+  console.log("no hay requisitions code para procesar")  }
 
 } catch (err) {
   console.error(err);
