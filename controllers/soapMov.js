@@ -7,12 +7,14 @@ const oracledb = require("oracledb");
 const jsonxml = require("jsonxml");
 
 oracledb.autoCommit = true;
+oracledb.fetchAsString = [ oracledb.NUMBER ];
 process.env.ORA_SDTZ = "UTC";
 
 let xml, url, sampleHeaders, output, xmlreq, sessionID, connection;
 
 // soap  request ID session
-url = "http://10.0.23.50:8080/DataServices/servlet/webservices?ver=2.1";
+//url = "http://10.0.23.50:8080/DataServices/servlet/webservices?ver=2.1";
+url = "http://itzisapdtp21.zigroup.local:8080/DataServices/servlet/webservices?ver=2.1";
 sampleHeaders = {
   "user-agent": "sampleTest",
   "Content-Type": "text/xml;charset=UTF-8",
@@ -31,9 +33,9 @@ async function movement__() {
       timeout: 5000,
     }); // Optional timeout parameter(milliseconds)
     let { headers, body, statusCode } = response;
-    console.log(headers);
-    console.log(body);
-    console.log(statusCode);
+    //console.log(headers);
+    //console.log(body);
+ //   console.log(statusCode);
     const template = [
       "soapenv:Envelope/soapenv:Body/localtypes:session",
       {
@@ -46,8 +48,9 @@ async function movement__() {
     sessionID = output[0].SessionID;
     //console.log(sessionID);
 
-    //request purchase order
-    url = "http://10.0.23.50:8080/DataServices/servlet/webservices?ver=2.1";
+    //request movement
+    //url = "http://10.0.23.50:8080/DataServices/servlet/webservices?ver=2.1";
+    url = "http://itzisapdtp21.zigroup.local:8080/DataServices/servlet/webservices?ver=2.1";
     sampleHeaders = {
       "user-agent": "sampleTest",
       "Content-Type": "text/xml;charset=UTF-8",
@@ -68,6 +71,7 @@ async function movement__() {
       from r5transactions tr, r5translines tl, r5parts pa, 
       sap_planta sp, sap_mov sm, sap_cencos sc, sap_uom su
       where 1 = 1
+     -- and tr.tra_code IN (1239573)
       and tl.trl_trans = tr.tra_code
       and tl.trl_part = pa.par_code
       and sp.PLANTA_EAM = tr.TRA_FROMCODE
@@ -87,12 +91,12 @@ async function movement__() {
       });
 
       let id_a_proc;
+      //console.log(id_a_proc);
 
       let primerCiclo = true;
 
       for (const row of result.rows) {
         id_a_proc = row.ID_A_PROC;
-
 
         // Select
         sql = `select SUBSTR(tr.tra_desc, 1, 25) HEADER_TXT ,
@@ -130,7 +134,7 @@ async function movement__() {
             "inp:HEADER_TXT": column.HEADER_TXT,
           },
         }));
-        // console.log(E1BP2017_GM_HEAD_01);
+        console.log(E1BP2017_GM_HEAD_01);
 
         let xmlHead = jsonxml(E1BP2017_GM_HEAD_01, options);
 
@@ -188,7 +192,8 @@ async function movement__() {
           options
         );
 
-        //reesult = await connection.execute(sql, {}, { outFormat: oracledb.OBJECT });
+       
+        //result = await connection.execute(sql, {}, { outFormat: oracledb.OBJECT });
 
         // console.log("RESULTSET:" + JSON.stringify(result));
 
@@ -206,7 +211,7 @@ async function movement__() {
           },
         }));
 
-        //console.log(E1BP2017_GM_ITEM_CREATE);
+        console.log(E1BP2017_GM_ITEM_CREATE);
 
         let xmlDetail = jsonxml(E1BP2017_GM_ITEM_CREATE, options);
 
@@ -264,11 +269,11 @@ async function movement__() {
 
          if (tipo === 'E') {
 
-        logger.transactionLog.log('error', `${contErr} procesado con error no se marcó en base de datos. ID req : ${id_a_proc}.`);
+        logger.transactionLog.log('error', `${contErr} procesado con error no se marcó en base de datos. ID tra : ${id_a_proc}.`);
 
         } else if (statusCode.response.statusCode === 200 && tipo != "E") {
           sql = `UPDATE r5translines SET TRL_UDFCHKBOX05 = '+',
-           TRL_UDFDATE05 = sysdate WHERE trl_trans IN :id_param`;
+           TRL_UDFDATE05 = sysdate WHERE trl_trans IN :id_param `;
           //and trl_line = :id_param_line`;
 
           options = {
@@ -296,11 +301,11 @@ async function movement__() {
 
 
         }
-        //termina foreach para ejecutar cada id del
 
-        console.log("\nEl id a proc es:", id_a_proc);
+       // console.log("\nEl id a proc es:", id_a_proc);
         primerCiclo = false;
       }
+        //termina foreach para ejecutar cada id del
 
       if (primerCiclo === true) {
         console.log("no hay transactions codes para procesar")

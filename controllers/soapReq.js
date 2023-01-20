@@ -29,7 +29,8 @@ let xml, url, sampleHeaders, output, xmlreq, sessionID, connection;
 async function requisition__ () {
   
   // soap  request ID session 
- url = 'http://10.0.23.50:8080/DataServices/servlet/webservices?ver=2.1';
+ //url = 'http://10.0.23.50:8080/DataServices/servlet/webservices?ver=2.1';
+ url = "http://itzisapdtp21.zigroup.local:8080/DataServices/servlet/webservices?ver=2.1";
  sampleHeaders = {
   'user-agent': 'sampleTest',
   'Content-Type': 'text/xml;charset=UTF-8',
@@ -41,9 +42,9 @@ xml = fs.readFileSync('test/logon.xml', 'utf-8');
   (async () => {
    let { response } = await soapRequest({ url: url, headers: sampleHeaders, xml: xml, timeout: 5000 }); // Optional timeout parameter(milliseconds)
    let { headers, body, statusCode } = response;
-    console.log(headers);
+    //console.log(headers);
     //console.log(body);
-    console.log(statusCode);
+   //console.log(statusCode);
     //extraemos el session id del xml respuesta del logon
     const template = ['soapenv:Envelope/soapenv:Body/localtypes:session', {
      SessionID: 'SessionID' ,
@@ -52,10 +53,11 @@ xml = fs.readFileSync('test/logon.xml', 'utf-8');
   output = await transform(body, template);
 
 sessionID = (output[0].SessionID);
-console.log(sessionID);
+//console.log(sessionID);
 
 //request purchase order
-url = 'http://10.0.23.50:8080/DataServices/servlet/webservices?ver=2.1';
+//url = 'http://10.0.23.50:8080/DataServices/servlet/webservices?ver=2.1';
+url = "http://itzisapdtp21.zigroup.local:8080/DataServices/servlet/webservices?ver=2.1";
 sampleHeaders = {
  'user-agent': 'sampleTest',
  'Content-Type': 'text/xml;charset=UTF-8',
@@ -75,6 +77,7 @@ try {
   FROM (select DISTINCT rq.req_code param, rq.req_date f_crea
   from r5requisitions rq, r5requislines rl, sap_planta sp, sap_mov sm, sap_uom su
   where rq.req_code = rl.rql_req
+  --and rq.req_code IN (1239404, 1239501)
   and rq.req_status = 'A'
   and (rl.rql_udfchkbox05 = '-' or rl.rql_udfchkbox05 IS NULL)
   and sp.PLANTA_EAM = rq.REQ_TOCODE
@@ -130,7 +133,7 @@ try {
  and DECODE(SIGN(rl.rql_qty), (-1), '-', '+') = sm.SIGNO
  and su.UOM_EAM (+)= rl.rql_uom
  and rq.req_code = :id_req
- and rl.rql_part not in ('58022510-M')
+ --and rl.rql_part not in ('58022510-M')
  order by rl.rql_reqline`;
 
  options = {
@@ -147,7 +150,7 @@ outFormat: oracledb.OBJECT
 //hacer update despues del estatus 200 acordarsze de ese pendiente
 //hacer de nuevo el select 
 
-console.log('RESULTSET:' + JSON.stringify(result));
+//console.log('RESULTSET:' + JSON.stringify(result));
   
 let EDI_DC40 = [];
 
@@ -160,11 +163,12 @@ EDI_DC40 = result.rows.map((column) => ({
     "inp:TRACKINGNO": column.TRACK_NO,
     "inp:QUANTITY": column.QTY,
     "inp:UNIT": column.UOM,
-    "inp:DELIV_DATE": column.DELIV_DATE,   
+    "inp:DELIV_DATE": column.DELIV_DATE,
+    "inp:PURCH_ORG":"SLP1",   
   },
 }));
 
-console.log(EDI_DC40);
+//console.log(EDI_DC40);
 //logger.requisitionLog.log('info', EDI_DC40);
 
 let xml2 = jsonxml(EDI_DC40, options)
@@ -186,12 +190,12 @@ xmlreq = `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envel
 </soapenv:Body>
 </soapenv:Envelope>`;
 
-console.log(xmlreq);
+//console.log(xmlreq);
 
 //request purchase order
  response  = await soapRequest({ url: url, headers: sampleHeaders, xml: xmlreq, timeout: 55000 }); // Optional timeout parameter(milliseconds)
  headers, body, statusCode = response;
-console.log(statusCode);
+//console.log(statusCode);
 
 //convertimos respuesta de type xml en variable
 const template = ['soapenv:Envelope/soapenv:Body/response/messages/message', {
@@ -204,8 +208,8 @@ const propiedades = await transform(statusCode.response.body, template);
 const tipo = (propiedades[0].type);
 const contErr = (propiedades[0].content);
 
-console.log(tipo);
-console.log(contErr);
+//console.log(tipo);
+//console.log(contErr);
 
 
 if(tipo === 'E'){
