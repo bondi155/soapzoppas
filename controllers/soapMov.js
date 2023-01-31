@@ -13,8 +13,8 @@ process.env.ORA_SDTZ = "UTC";
 let xml, url, sampleHeaders, output, xmlreq, sessionID, connection;
 
 // soap  request ID session
-//url = "http://10.0.23.50:8080/DataServices/servlet/webservices?ver=2.1";
-url = "http://itzisapdtp21.zigroup.local:8080/DataServices/servlet/webservices?ver=2.1";
+url = "http://10.0.23.50:8080/DataServices/servlet/webservices?ver=2.1";
+//url = "http://itzisapdtp21.zigroup.local:8080/DataServices/servlet/webservices?ver=2.1";
 sampleHeaders = {
   "user-agent": "sampleTest",
   "Content-Type": "text/xml;charset=UTF-8",
@@ -84,7 +84,7 @@ async function movement__() {
       and su.UOM_EAM (+)= pa.par_uom
       --and tr.tra_created > (sysdate - 6)
       order by 2 DESC) a1
-      WHERE ROWNUM < 21`;
+      WHERE ROWNUM < 9`;
 
       result = await connection.execute(sql, [], {
         outFormat: oracledb.OUT_FORMAT_OBJECT,
@@ -269,11 +269,35 @@ async function movement__() {
 
          if (tipo === 'E') {
 
+          sql = `UPDATE r5translines SET TRL_UDFCHAR05 = SUBSTR(:msg_err, 1, 80), TRL_UDFDATE05 = sysdate WHERE trl_trans IN :id_param`;
+
+          options = {
+            outFormat: oracledb.OBJECT,
+          };
+
+          result = await connection.execute(
+            sql,
+            {
+              msg_err: {
+                dir: oracledb.BIND_IN,
+                val: contErr,
+                type: oracledb.STRING,
+              },
+              id_param: {
+                dir: oracledb.BIND_IN,
+                val: id_a_proc,
+                type: oracledb.STRING,
+              },
+            },
+            options
+          );
+
         logger.transactionLog.log('error', `${contErr} procesado con error no se marcó en base de datos. ID tra : ${id_a_proc}.`);
 
         } else if (statusCode.response.statusCode === 200 && tipo != "E") {
+
           sql = `UPDATE r5translines SET TRL_UDFCHKBOX05 = '+',
-           TRL_UDFDATE05 = sysdate WHERE trl_trans IN :id_param `;
+           TRL_UDFDATE05 = sysdate, TRL_UDFCHAR05 = :msg_ok WHERE trl_trans IN :id_param `;
           //and trl_line = :id_param_line`;
 
           options = {
@@ -288,16 +312,16 @@ async function movement__() {
                 dir: oracledb.BIND_IN,
                 val: id_a_proc,
                 type: oracledb.STRING,
-              }/*
-              id_param_lin: {
+              },
+              msg_ok: {
                 dir: oracledb.BIND_IN,
-                val: id_a_proc_lin,
+                val: "Procesado Correctamente",
                 type: oracledb.STRING,
-              },*/
+              },
             },
             options
           );
-          logger.transactionLog.log('info', `procesado correctamente. ID mov : ${id_a_proc} . ${contErr}`);
+          logger.transactionLog.log('info', `Procesado Correctamente. ID mov : ${id_a_proc} . ${contErr}`);
 
 
         }
