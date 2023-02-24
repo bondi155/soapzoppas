@@ -49,8 +49,8 @@ async function movement__() {
     //console.log(sessionID);
 
     //request movement
-    //url = "http://10.0.23.50:8080/DataServices/servlet/webservices?ver=2.1";
-    url = "http://itzisapdtp21.zigroup.local:8080/DataServices/servlet/webservices?ver=2.1";
+    url = "http://10.0.23.50:8080/DataServices/servlet/webservices?ver=2.1";
+    //url = "http://itzisapdtp21.zigroup.local:8080/DataServices/servlet/webservices?ver=2.1";
     sampleHeaders = {
       "user-agent": "sampleTest",
       "Content-Type": "text/xml;charset=UTF-8",
@@ -71,7 +71,7 @@ async function movement__() {
       from r5transactions tr, r5translines tl, r5parts pa, 
       sap_planta sp, sap_mov sm, sap_cencos sc, sap_uom su
       where 1 = 1
-     -- and tr.tra_code IN (1239573)
+      --and tr.tra_code IN (1052129)
       and tl.trl_trans = tr.tra_code
       and tl.trl_part = pa.par_code
       and sp.PLANTA_EAM = tr.TRA_FROMCODE
@@ -82,9 +82,13 @@ async function movement__() {
       and tr.tra_status = 'A'
       and (trl_udfchkbox05 = '-' or trl_udfchkbox05 IS NULL)
       and su.UOM_EAM (+)= pa.par_uom
-      --and tr.tra_created > (sysdate - 6)
+      --AND (((tr.tra_type != 'I') AND (tra_fromentity = 'STOR' AND tra_toentity =  'STOR'))
+      --OR (tra_fromentity <> 'STOR' OR tra_toentity <> 'STOR'))
+      AND (((tra_fromentity = 'STOR' AND tra_toentity =  'STOR') AND (ENTRE_ALMACENES = 1))
+      OR ((tra_fromentity <> 'STOR' OR tra_toentity <> 'STOR') AND (ENTRE_ALMACENES = 0 OR ENTRE_ALMACENES IS NULL)))
+      and TRL_UDFDATE05 is NULL
       order by 2 DESC) a1
-      WHERE ROWNUM < 9`;
+      WHERE ROWNUM < 2`;
 
       result = await connection.execute(sql, [], {
         outFormat: oracledb.OUT_FORMAT_OBJECT,
@@ -100,10 +104,13 @@ async function movement__() {
 
         // Select
         sql = `select SUBSTR(tr.tra_desc, 1, 25) HEADER_TXT ,
-        TO_CHAR(tr.tra_created, 'YYYYMMDD') DOC_DATE,
-        TO_CHAR(tr.tra_updated, 'YYYYMMDD') PSTNG_DATE
-        from r5transactions tr
-        where tr.tra_code = :id_mov`;
+          TO_CHAR(tr.tra_created, 'YYYYMMDD') DOC_DATE,
+          TO_CHAR(tr.tra_updated, 'YYYYMMDD') PSTNG_DATE,
+          (CASE WHEN (tra_fromentity = 'STOR' AND tra_toentity =  'STOR') 
+          THEN tra_req ELSE tra_code END) REF_MOV,
+          (CASE WHEN (tra_fromentity = 'STOR' AND tra_toentity =  'STOR') 
+          THEN  '03' ELSE '06' END) GM_CODE
+          from r5transactions tr where tr.tra_code =:id_mov`;
 
         options = {
           outFormat: oracledb.OBJECT,
@@ -131,9 +138,14 @@ async function movement__() {
           "inp:E1BP2017_GM_HEAD_01": {
             "inp:PSTNG_DATE": column.PSTNG_DATE,
             "inp:DOC_DATE": column.DOC_DATE,
+            "inp:REF_DOC_NO":column.REF_MOV,
             "inp:HEADER_TXT": column.HEADER_TXT,
           },
+          "inp:E1BP2017_GM_CODE": {
+            "inp:GM_CODE": column.GM_CODE
+          }
         }));
+
         console.log(E1BP2017_GM_HEAD_01);
 
         let xmlHead = jsonxml(E1BP2017_GM_HEAD_01, options);
@@ -144,7 +156,8 @@ async function movement__() {
         TO_CHAR (tr.tra_updated, 'YYYYMMDD') DELIV_DATE,
         sp.PLANTA_SAP PLANTA,
         sm.MOV_SAP COD_MOV,
-        NVL(sc.CENCOS_SAP, tl.trl_costcode) CENCOS,
+        (CASE WHEN (tra_fromentity = 'STOR' AND tra_toentity =  'STOR') 
+        THEN  ' ' ELSE NVL(sc.CENCOS_SAP, tl.trl_costcode) END) CENCOS,
         TO_CHAR(tr.tra_code)||LPAD(tl.trl_line,2, '0') TRACK_NO,
         tr.tra_type,
         tr.tra_org,
@@ -174,6 +187,11 @@ async function movement__() {
         and tr.tra_status = 'A'
         and (trl_udfchkbox05 = '-' or trl_udfchkbox05 IS NULL)
         and su.UOM_EAM (+)= pa.par_uom
+       --AND (((tr.tra_type != 'I') AND (tra_fromentity = 'STOR' AND tra_toentity =  'STOR'))
+        --OR (tra_fromentity <> 'STOR' OR tra_toentity <> 'STOR'))
+        AND (((tra_fromentity = 'STOR' AND tra_toentity =  'STOR') AND (ENTRE_ALMACENES = 1))
+        OR ((tra_fromentity <> 'STOR' OR tra_toentity <> 'STOR') AND (ENTRE_ALMACENES = 0 OR ENTRE_ALMACENES IS NULL)))
+        and TRL_UDFDATE05 is NULL
         order BY tl.trl_line`;
 
         options = {
@@ -192,7 +210,6 @@ async function movement__() {
           options
         );
 
-       
         //result = await connection.execute(sql, {}, { outFormat: oracledb.OBJECT });
 
         // console.log("RESULTSET:" + JSON.stringify(result));
@@ -229,10 +246,7 @@ async function movement__() {
             </inp:EDI_DC40>
             <inp:E1MBGMCR>
             ${xmlHead}
-              <inp:E1BP2017_GM_CODE>
-                  <inp:GM_CODE>03</inp:GM_CODE>
-              </inp:E1BP2017_GM_CODE>
-              ${xmlDetail}
+            ${xmlDetail}
             </inp:E1MBGMCR>
         </inp:MBGMCR03>
         </soapenv:Body>

@@ -77,15 +77,18 @@ async function requisition__() {
       FROM (select DISTINCT rq.req_code param, rq.req_date f_crea
       from r5requisitions rq, r5requislines rl, sap_planta sp, sap_mov sm, sap_uom su
       where rq.req_code = rl.rql_req
-      --and rq.req_code IN (1239404, 1239501)
+      and rq.req_code IN (12333)
       and rq.req_status = 'A'
       and (rl.rql_udfchkbox05 = '-' or rl.rql_udfchkbox05 IS NULL)
       and sp.PLANTA_EAM = rq.REQ_TOCODE
       and sm.MOV_EAM = rq.req_type
       and DECODE(SIGN(rl.rql_qty), (-1), '-', '+') = sm.SIGNO
       and su.UOM_EAM (+)= rl.rql_uom
+      AND (((req_fromentity = 'STOR' AND req_toentity =  'STOR') AND (ENTRE_ALMACENES = 1))
+      OR ((req_fromentity <> 'STOR' OR req_toentity <> 'STOR') AND (ENTRE_ALMACENES = 0 OR ENTRE_ALMACENES IS NULL)))
+      and RQL_UDFDATE05 IS NULL
       order by 2 DESC) a1
-      WHERE ROWNUM < 21`;
+      WHERE ROWNUM < 20`;
 
       result = await connection.execute(sql, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
 
@@ -100,41 +103,43 @@ async function requisition__() {
 
         // Select
         sql = `select rq.req_code,
-            rq.req_desc,
-            rq.req_date,
-            TO_CHAR(rq.req_date, 'YYYYMMDD') DELIV_DATE,
-            TO_CHAR(rq.req_code)||LPAD(rl.rql_reqline ,2, '0') TRACK_NO,
-            rq.req_status,
-            sp.PLANTA_SAP PLANTA,
-            sp.STORAGE_SAP STOR_LOC,
-            sm.MOV_SAP COD_MOV,
-            rq.req_fromentity,
-            rq.req_type,
-            rq.req_toentity,
-            rq.req_tocode,
-            rq.req_interface,
-            rq.req_org,
-            rq.req_interface,
-            rq.req_udfchkbox05,
-            rl.rql_type,
-            rl.rql_req,
-            rl.rql_reqline linea,
-            rl.rql_part RQL_PART,
-            rl.rql_part_org RQL_PART_ORG,
-            abs (rl.rql_qty) QTY,
-            NVL(su.UOM_SAP, rl.rql_uom) UOM,
-            rl.rql_due
-            from r5requisitions rq, r5requislines rl, sap_planta sp, sap_mov sm, sap_uom su
-            where rq.req_code = rl.rql_req
-            and rq.req_status = 'A'
-            and (rl.rql_udfchkbox05 = '-' or rl.rql_udfchkbox05 IS NULL)
-            and sp.PLANTA_EAM = rq.REQ_TOCODE
-            and sm.MOV_EAM = rq.req_type
-            and DECODE(SIGN(rl.rql_qty), (-1), '-', '+') = sm.SIGNO
-            and su.UOM_EAM (+)= rl.rql_uom
-            and rq.req_code = :id_req
-            --and rl.rql_part not in ('58022510-M')
-            order by rl.rql_reqline`;
+        rq.req_desc,
+        rq.req_date,
+        TO_CHAR(rq.req_date, 'YYYYMMDD') DELIV_DATE,
+        TO_CHAR(rq.req_code)||LPAD(rl.rql_reqline ,2, '0') TRACK_NO,
+        rq.req_status,
+        sp.PLANTA_SAP PLANTA,
+        sp.STORAGE_SAP STOR_LOC,
+        sm.MOV_SAP COD_MOV,
+        rq.req_fromentity,
+        rq.req_type,
+        rq.req_toentity,
+        rq.req_tocode,
+        rq.req_interface,
+        rq.req_org,
+        rq.req_interface,
+        rq.req_udfchkbox05,
+        rl.rql_type,
+        rl.rql_req,
+        rl.rql_reqline linea,
+        rl.rql_part RQL_PART,
+        rl.rql_part_org RQL_PART_ORG,
+        abs (rl.rql_qty) QTY,
+        NVL(su.UOM_SAP, rl.rql_uom) UOM,
+        rl.rql_due
+        from r5requisitions rq, r5requislines rl, sap_planta sp, sap_mov sm, sap_uom su
+        where rq.req_code = rl.rql_req
+        and rq.req_status = 'A'
+        and (rl.rql_udfchkbox05 = '-' or rl.rql_udfchkbox05 IS NULL)
+        and sp.PLANTA_EAM = rq.REQ_TOCODE
+        and sm.MOV_EAM = rq.req_type
+        and DECODE(SIGN(rl.rql_qty), (-1), '-', '+') = sm.SIGNO
+        and su.UOM_EAM (+)= rl.rql_uom
+        AND (((req_fromentity = 'STOR' AND req_toentity =  'STOR') AND (ENTRE_ALMACENES = 1))
+        OR ((req_fromentity <> 'STOR' OR req_toentity <> 'STOR') AND (ENTRE_ALMACENES = 0 OR ENTRE_ALMACENES IS NULL)))
+        and rq.req_code = :id_req
+        and RQL_UDFDATE05 IS NULL
+        order by rl.rql_reqline`;
 
         options = {
           outFormat: oracledb.OBJECT
@@ -168,7 +173,7 @@ async function requisition__() {
           },
         }));
 
-        //console.log(EDI_DC40);
+        console.log(EDI_DC40);
         //logger.requisitionLog.log('info', EDI_DC40);
 
         let xml2 = jsonxml(EDI_DC40, options)
@@ -190,7 +195,7 @@ async function requisition__() {
 </soapenv:Body>
 </soapenv:Envelope>`;
 
-        //console.log(xmlreq);
+        console.log(xmlreq);
 
         //request purchase order
         response = await soapRequest({ url: url, headers: sampleHeaders, xml: xmlreq, timeout: 55000 }); // Optional timeout parameter(milliseconds)
