@@ -36,6 +36,32 @@ const transactionLog = createLogger({
         })
     ]
 })
+const transactionLogstd = createLogger({
+    
+    transports:[
+     new transports.DailyRotateFile({ 
+ 
+             filename: 'log/Movstd-%DATE%.log',
+             datePattern:'YYYY-MM-DD',
+             level: 'info',
+             maxSize: '20m',
+             maxFiles: '14d',
+             zippedArchive: true,
+             format: format.combine(format.timestamp({format: timezoned}), format.prettyPrint())
+ 
+         }),
+         new transports.DailyRotateFile({
+             filename:'log/error-Movstd-%DATE%.log',
+             level:'error',
+             maxSize: '20m',
+             maxFiles: '14d',
+             zippedArchive: true,
+             datePattern: 'YYYY-MM-DD',
+             format: format.combine(format.timestamp({format: timezoned}), format.prettyPrint())
+ 
+         })
+     ]
+ })
 
 const requisitionLog = createLogger({
     
@@ -60,15 +86,46 @@ const requisitionLog = createLogger({
              datePattern: 'YYYY-MM-DD',
              format: format.combine(format.timestamp({format: timezoned}), format.prettyPrint())
  
-         })
+         }),
+         
      ]
  })
 
+ const requisitionLogstd = createLogger({
+    
+    transports:[
+     new transports.DailyRotateFile({ 
+ 
+             filename: 'log/Purchstd-%DATE%.log',
+             datePattern:'YYYY-MM-DD',
+             level: 'info',
+             maxSize: '20m',
+             maxFiles: '14d',
+             zippedArchive: true,
+             format: format.combine(format.timestamp({format: timezoned}), format.prettyPrint())
+ 
+         }),
+         new transports.DailyRotateFile({
+             filename:'log/error-Purchstd-%DATE%.log',
+             level:'error',
+             maxSize: '20m',
+             maxFiles: '14d',
+             zippedArchive: true,
+             datePattern: 'YYYY-MM-DD',
+             format: format.combine(format.timestamp({format: timezoned}), format.prettyPrint())
+ 
+         }),
+         
+     ]
+ })
 
-
-//si no se quiere log diario con fecha en filename cambiar DailyRotateFile x file y quitar %DATE% de los titulos.
+ //si no se quiere log diario con fecha en filename cambiar DailyRotateFile x file y quitar %DATE% de los titulos.
 
 module.exports={
     transactionLog,
-    requisitionLog
+    requisitionLog,
+    requisitionLogstd,
+    transactionLogstd
+    
+
 }

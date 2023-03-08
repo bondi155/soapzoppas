@@ -2,7 +2,7 @@ const fs = require("fs-extra");
 const dbConfig = require("../config/dbconfig");
 const soapRequest = require("easy-soap-request");
 const { transform } = require("camaro");
-const logger = require("./logger");
+const logger = require("../controllers/logger");
 const oracledb = require("oracledb");
 const jsonxml = require("jsonxml");
 
@@ -23,14 +23,14 @@ sampleHeaders = {
 
 xml = fs.readFileSync("test/logon.xml", "utf-8");
 
-//MOVEMENT TRANS ENTRE ALMACENES 
-async function movement__() {
+// MOVEMENT TRANS STANDAR
+async function movementstd__() {
   (async () => {
     let { response } = await soapRequest({
       url: url,
       headers: sampleHeaders,
       xml: xml,
-      timeout: 5000,
+      timeout: 8000,
     }); // Optional timeout parameter(milliseconds)
     let { headers, body, statusCode } = response;
     //console.log(headers);
@@ -63,10 +63,10 @@ async function movement__() {
       let sql, binds, options, result;
 
       connection = await oracledb.getConnection(dbConfig);
-      logger.transactionLog.log("info", "succefull connection to oracle DB ");
+      logger.transactionLogstd.log("info", "succefull connection to oracle DB ");
 
       //select parametro movement transaction
-      sql = `SELECT a1.param id_a_proc
+      sql = `    SELECT a1.param id_a_proc
       FROM (select DISTINCT tr.tra_code param, tr.tra_created f_crea
       from r5transactions tr, r5translines tl, r5parts pa, 
       sap_planta sp, sap_mov sm, sap_cencos sc, sap_uom su
@@ -86,8 +86,9 @@ async function movement__() {
       --OR (tra_fromentity <> 'STOR' OR tra_toentity <> 'STOR'))
       /*AND (((tra_fromentity = 'STOR' AND tra_toentity =  'STOR') AND (ENTRE_ALMACENES = 1))
       OR ((tra_fromentity <> 'STOR' OR tra_toentity <> 'STOR') AND (ENTRE_ALMACENES = 0 OR ENTRE_ALMACENES IS NULL)))*/
-      AND ((tra_fromentity = 'STOR' AND tra_toentity =  'STOR') AND (ENTRE_ALMACENES = 1))
-      --AND ((tra_fromentity <> 'STOR' OR tra_toentity <> 'STOR') AND (ENTRE_ALMACENES = 0 OR ENTRE_ALMACENES IS NULL))
+      --AND ((tra_fromentity = 'STOR' AND tra_toentity =  'STOR') AND (ENTRE_ALMACENES = 1))
+      AND ((tra_fromentity <> 'STOR' OR tra_toentity <> 'STOR') AND (ENTRE_ALMACENES = 0 OR ENTRE_ALMACENES IS NULL))
+      --and TRL_UDFDATE05 is NULL
       order by 2 DESC) a1
       WHERE ROWNUM < 2`;
 
@@ -188,7 +189,7 @@ async function movement__() {
         and tr.tra_status = 'A'
         and (trl_udfchkbox05 = '-' or trl_udfchkbox05 IS NULL)
         and su.UOM_EAM (+)= pa.par_uom
-        AND ((tra_fromentity = 'STOR' AND tra_toentity =  'STOR') AND (ENTRE_ALMACENES = 1))
+        AND ((tra_fromentity <> 'STOR' OR tra_toentity <> 'STOR') AND (ENTRE_ALMACENES = 0 OR ENTRE_ALMACENES IS NULL))
         order BY tl.trl_line`;
 
         options = {
@@ -261,7 +262,7 @@ async function movement__() {
         //console.log(statusCode.status);
         //console.log(body);
 
-        logger.transactionLog.log("info", statusCode.response.body && statusCode.response.statusCode);
+        logger.transactionLogstd.log("info", statusCode.response.body && statusCode.response.statusCode);
 
         //console.log(statusCode.response.statusCode);
         //convertimos respuesta de type xml en variable
@@ -280,8 +281,7 @@ async function movement__() {
 
          if (tipo === 'E') {
 
-          sql = `UPDATE r5translines SET TRL_UDFCHAR05 = SUBSTR(:msg_err, 1, 80), TRL_UDFDATE05 = sysdate, 
-          TRL_UDFCHKBOX05 = 'E' WHERE trl_trans IN :id_param`;
+          sql = `UPDATE r5translines SET TRL_UDFCHAR05 = SUBSTR(:msg_err, 1, 80), TRL_UDFDATE05 = sysdate, TRL_UDFCHKBOX05 = 'E' WHERE trl_trans IN :id_param`;
 
           options = {
             outFormat: oracledb.OBJECT,
@@ -304,11 +304,11 @@ async function movement__() {
             options
           );
 
-        logger.transactionLog.log('error', `${contErr} Error, no procesado... Se marco con E en TRL_UDFCHKBOX05 ID tra : ${id_a_proc}.`);
+        logger.transactionLogstd.log('error', `${contErr} Error, no procesado... Se marco con E en TRL_UDFCHKBOX05. ID tra : ${id_a_proc}.`);
 
         } else if (statusCode.response.statusCode === 200 && tipo != "E") {
 
-          sql = `UPDATE r5translines SET TRL_UDFCHKBOX05 = '+', TRL_UDFCHAR30 = "ALM",
+          sql = `UPDATE r5translines SET TRL_UDFCHKBOX05 = '+', TRL_UDFCHAR30 = "STD",
            TRL_UDFDATE05 = sysdate, TRL_UDFCHAR05 = :msg_ok WHERE trl_trans IN :id_param `;
           //and trl_line = :id_param_line`;
 
@@ -333,7 +333,7 @@ async function movement__() {
             },
             options
           );
-          logger.transactionLog.log('info', `Procesado Correctamente. ID mov : ${id_a_proc} . ${contErr}`);
+          logger.transactionLogstd.log('info', `Procesado Correctamente. ID mov : ${id_a_proc} . ${contErr}`);
 
 
         }
@@ -350,9 +350,9 @@ async function movement__() {
     } catch (err) {
       console.error(err);
       if (err.code === 'ERR_BAD_RESPONSE') {
-        logger.transactionLog.log("error", err.response.data)
+        logger.transactionLogstd.log("error", err.response.data)
       } else {
-        logger.transactionLog.log("error", err.message)
+        logger.transactionLogstd.log("error", err.message)
       }
 
     } finally {
@@ -368,5 +368,5 @@ async function movement__() {
 }
 
 module.exports = {
-  movement__: movement__,
+  movementstd__: movementstd__,
 };

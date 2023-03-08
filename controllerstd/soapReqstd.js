@@ -2,7 +2,7 @@ const fs = require('fs-extra');
 const dbConfig = require('../config/dbconfig');
 const soapRequest = require('easy-soap-request');
 const { transform } = require('camaro');
-const logger = require('./logger');
+const logger = require('../controllers/logger');
 const oracledb = require('oracledb');
 const jsonxml = require('jsonxml');
 
@@ -26,7 +26,7 @@ process.env.ORA_SDTZ = 'UTC';
 let xml, url, sampleHeaders, output, xmlreq, sessionID, connection;
 
 // usage of module
-async function requisition__() {
+async function requisitionstd__() {
 
   // soap  request ID session 
   url = 'http://10.0.23.50:8080/DataServices/servlet/webservices?ver=2.1';
@@ -45,6 +45,7 @@ async function requisition__() {
     //console.log(headers);
     //console.log(body);
     //console.log(statusCode);
+    
     //extraemos el session id del xml respuesta del logon
     const template = ['soapenv:Envelope/soapenv:Body/localtypes:session', {
       SessionID: 'SessionID',
@@ -55,7 +56,7 @@ async function requisition__() {
     sessionID = (output[0].SessionID);
     //console.log(sessionID);
 
-    //request purchase order ENTRE ALMACENES
+    //request purchase order
     url = 'http://10.0.23.50:8080/DataServices/servlet/webservices?ver=2.1';
     //url = "http://itzisapdtp21.zigroup.local:8080/DataServices/servlet/webservices?ver=2.1";
     sampleHeaders = {
@@ -70,7 +71,7 @@ async function requisition__() {
       let sql, binds, options, result;
 
       connection = await oracledb.getConnection(dbConfig);
-      //  logger.requisitionLog.log('info', 'succefull connection to oracle DB ');
+      //  logger.requisitionLogstd.log('info', 'succefull connection to oracle DB ');
 
       //Select de parametro ID requisition
       sql = `SELECT a1.param id_a_proc
@@ -87,7 +88,7 @@ async function requisition__() {
       --AND (((req_fromentity = 'STOR' AND req_toentity =  'STOR') AND (ENTRE_ALMACENES = 1))
       --OR ((req_fromentity <> 'STOR' OR req_toentity <> 'STOR') AND (ENTRE_ALMACENES = 0 OR ENTRE_ALMACENES IS NULL)))
       --and RQL_UDFDATE05 IS NULL
-      and ((req_fromentity = 'STOR' AND req_toentity =  'STOR') AND (ENTRE_ALMACENES = 1)) --Agregado
+      and ((req_fromentity <> 'STOR' OR req_toentity <> 'STOR') AND (ENTRE_ALMACENES = 0 OR ENTRE_ALMACENES IS NULL)) --Agregado
       order by 2 DESC) a1
       WHERE ROWNUM < 2`;
 
@@ -140,7 +141,7 @@ async function requisition__() {
         --OR ((req_fromentity <> 'STOR' OR req_toentity <> 'STOR') AND (ENTRE_ALMACENES = 0 OR ENTRE_ALMACENES IS NULL)))
         and rq.req_code = :id_req
         --and RQL_UDFDATE05 IS NULL
-        and ((req_fromentity = 'STOR' AND req_toentity =  'STOR') AND (ENTRE_ALMACENES = 1)) --Agregado
+        and ((req_fromentity <> 'STOR' OR req_toentity <> 'STOR') AND (ENTRE_ALMACENES = 0 OR ENTRE_ALMACENES IS NULL)) --Agregado
         order by rl.rql_reqline`;
 
         options = {
@@ -176,7 +177,7 @@ async function requisition__() {
         }));
 
         console.log(EDI_DC40);
-        //logger.requisitionLog.log('info', EDI_DC40);
+        //logger.requisitionLogstd.log('info', EDI_DC40);
 
         let xml2 = jsonxml(EDI_DC40, options)
 
@@ -221,7 +222,7 @@ async function requisition__() {
 
         if (tipo === 'E') {
 
-          sql = `UPDATE r5requislines SET  RQL_UDFCHAR05 = SUBSTR(:msg_err, 1, 80), 
+          sql = `UPDATE r5requislines SET RQL_UDFCHAR05 = SUBSTR(:msg_err, 1, 80), 
           RQL_UDFDATE05 = sysdate, RQL_UDFCHKBOX05 = 'E' WHERE rql_req IN :id_param`;
 
           options = {
@@ -245,7 +246,7 @@ async function requisition__() {
             options
           );
 
-          logger.requisitionLog.log('error', `${contErr} Error, no procesado... Se marco con E en RQL_UDFCHKBOX05. ID req : ${id_a_proc}.`);
+          logger.requisitionLogstd.log('error', `${contErr} Error, no procesado.. Se marco con E en RQL_UDFCHKBOX05. ID req : ${id_a_proc}.`);
 
         } else if (statusCode.response.statusCode === 200 && tipo != 'E') {
           /*
@@ -254,7 +255,7 @@ async function requisition__() {
           and rql_reqline = :id_param_line`;
         */
 
-          sql = `UPDATE r5requislines SET RQL_UDFCHKBOX05 = '+', RQL_UDFCHAR30 = "ALM",
+          sql = `UPDATE r5requislines SET RQL_UDFCHKBOX05 = '+', RQL_UDFCHAR30 = "STD",
           RQL_UDFDATE05 = sysdate, RQL_UDFCHAR05 = :msg_ok WHERE rql_req = :id_param`;
 
           options = {
@@ -275,7 +276,7 @@ async function requisition__() {
             },
           }, options);
 
-          logger.requisitionLog.log('info', `procesado correctamente. ID req : ${id_a_proc} .${contErr}`);
+          logger.requisitionLogstd.log('info', `procesado correctamente. ID req : ${id_a_proc} .${contErr}`);
 
           //id_param_lin: { dir: oracledb.BIND_IN, val: id_a_proc_lin, type: oracledb.STRING }}, options)
 
@@ -293,9 +294,9 @@ async function requisition__() {
     } catch (err) {
       console.error(err);
       if (err.code === 'ERR_BAD_RESPONSE') {
-        logger.requisitionLog.log("error", err.response.data)
+        logger.requisitionLogstd.log("error", err.response.data)
       } else {
-        logger.requisitionLog.log("error", err.message)
+        logger.requisitionLogstd.log("error", err.message)
       }
 
     } finally {
@@ -312,5 +313,5 @@ async function requisition__() {
 };
 
 module.exports = {
-  requisition__: requisition__
+  requisitionstd__: requisitionstd__
 } 
